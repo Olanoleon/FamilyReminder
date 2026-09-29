@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'preact/hooks';
-import { getCode, listDevices, sendTest, type Device } from './api';
+import { getCode, listDevices, removeSubscription, sendTest, type Device } from './api';
 import { Icon, Nav, Screen, Stars, memberOf, colorFor } from './common';
 import { currentSubscription, disablePush } from './push';
 
@@ -39,6 +39,15 @@ export function Crew({ onChanged }: { onChanged: () => void }) {
     await disablePush(); setMine(''); await load(); onChanged();
   }
 
+  async function removeDevice(d: Device) {
+    if (!confirm(`¿Quitar "${d.deviceName}" de la tripulación? Dejará de recibir avisos.`)) return;
+    try {
+      // For this phone, also drop the browser's own subscription, or the app would re-add it on next launch.
+      if (d.endpoint === mine) { await disablePush(); setMine(''); } else await removeSubscription(d.endpoint);
+      await load(); onChanged();
+    } catch { setResult({ ok: false, text: 'No se pudo quitar el teléfono. Inténtalo de nuevo.' }); }
+  }
+
   const code = getCode();
   return (
     <>
@@ -76,6 +85,9 @@ export function Crew({ onChanged }: { onChanged: () => void }) {
                   <span class="small">{d.platform} · suscrito el {d0.getDate()} {MON[d0.getMonth()]}</span>
                 </div>
                 <span aria-label="Activo" style={{ width: 10, height: 10, borderRadius: '50%', background: 'var(--green)' }} />
+                <button type="button" class="round" onClick={() => removeDevice(d)} aria-label={`Quitar ${d.deviceName}`} style={{ color: 'var(--red-soft)' }}>
+                  <Icon name="trash" size={18} />
+                </button>
               </div>
             );
           })}
