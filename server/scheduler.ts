@@ -5,6 +5,7 @@ import type { Store } from './store.ts';
 /** Fires every due reminder once. Reminders whose event already started are marked skipped instead of sent. */
 export async function tick(store: Store, send: Sender, now = Date.now()) {
   let fired = 0;
+  store.rollRecurring(now);
   for (const d of store.dueReminders(now)) {
     const stale = d.event.startsAt < now;
     if (!store.claimReminder(d.reminderId, stale)) continue; // claim first → at-most-once, even across restarts/overlapping ticks

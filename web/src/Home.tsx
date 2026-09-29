@@ -126,6 +126,7 @@ function TaskCard({ e, now }: { e: FamilyEvent; now: number }) {
               </span>
             ),
           )}
+          {e.repeatWeekly && <span class="pill"><Icon name="repeat" size={12} />cada semana</span>}
           {rs.length === 0 && <span class="pill">Sin avisos</span>}
         </div>
       </div>

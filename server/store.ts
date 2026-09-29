@@ -1,8 +1,9 @@
+import { addDays } from '../shared/time.ts';
 import type { Db } from './db.ts';
 
 export interface ReminderRow { id: number; offsetMinutes: number; fireAt: number; sentAt: number | null; skipped: boolean }
-export interface EventRow { id: number; title: string; who: string; startsAt: number; timezone: string; reminders: ReminderRow[] }
-export interface EventInput { title: string; who: string; startsAt: number; timezone: string; offsets: number[] }
+export interface EventRow { id: number; title: string; who: string; startsAt: number; timezone: string; repeatWeekly: boolean; reminders: ReminderRow[] }
+export interface EventInput { title: string; who: string; startsAt: number; timezone: string; repeatWeekly: boolean; offsets: number[] }
 export interface SubRow { id: number; endpoint: string; p256dh: string; auth: string; deviceName: string; platform: string; createdAt: number }
 
 export function createStore(db: Db, now: () => number = Date.now) {
@@ -10,9 +11,11 @@ export function createStore(db: Db, now: () => number = Date.now) {
     events: db.prepare('SELECT * FROM events ORDER BY starts_at'),
     event: db.prepare('SELECT * FROM events WHERE id = ?'),
     remindersOf: db.prepare('SELECT * FROM reminders WHERE event_id = ? ORDER BY offset_minutes DESC'),
-    insEvent: db.prepare('INSERT INTO events (title, who, starts_at, timezone, created_at) VALUES (?, ?, ?, ?, ?)'),
-    updEvent: db.prepare('UPDATE events SET title = ?, who = ?, starts_at = ?, timezone = ? WHERE id = ?'),
+    insEvent: db.prepare('INSERT INTO events (title, who, starts_at, timezone, repeat_weekly, created_at) VALUES (?, ?, ?, ?, ?, ?)'),
+    updEvent: db.prepare('UPDATE events SET title = ?, who = ?, starts_at = ?, timezone = ?, repeat_weekly = ? WHERE id = ?'),
     delEvent: db.prepare('DELETE FROM events WHERE id = ?'),
+    overdueRepeating: db.prepare('SELECT * FROM events WHERE repeat_weekly = 1 AND starts_at < ?'),
+    setStart: db.prepare('UPDATE events SET starts_at = ? WHERE id = ?'),
     insReminder: db.prepare('INSERT INTO reminders (event_id, offset_minutes, fire_at, sent_at, skipped) VALUES (?, ?, ?, ?, ?)'),
     delPending: db.prepare('DELETE FROM reminders WHERE event_id = ? AND sent_at IS NULL'),
     delAllReminders: db.prepare('DELETE FROM reminders WHERE event_id = ?'),
@@ -26,7 +29,7 @@ export function createStore(db: Db, now: () => number = Date.now) {
   };
 
   const toEvent = (r: any): EventRow => ({
-    id: r.id, title: r.title, who: r.who, startsAt: r.starts_at, timezone: r.timezone,
+    id: r.id, title: r.title, who: r.who, startsAt: r.starts_at, timezone: r.timezone, repeatWeekly: !!r.repeat_weekly,
     reminders: (q.remindersOf.all(r.id) as any[]).map((x) => ({
       id: x.id, offsetMinutes: x.offset_minutes, fireAt: x.fire_at, sentAt: x.sent_at, skipped: !!x.skipped,
     })),
@@ -38,8 +41,7 @@ export function createStore(db: Db, now: () => number = Date.now) {
   };
 
   /** Insert reminders for the given offsets; ones whose fire time already passed are stored as skipped. */
-  function addReminders(eventId: number, startsAt: number, offsets: number[]) {
-    const t = now();
+  function addReminders(eventId: number, startsAt: number, offsets: number[], t = now()) {
     for (const off of offsets) {
       const fireAt = startsAt - off * 60_000;
       const past = fireAt <= t;
@@ -52,7 +54,7 @@ export function createStore(db: Db, now: () => number = Date.now) {
     getEvent: (id: number) => { const r = q.event.get(id); return r ? toEvent(r) : null; },
 
     createEvent: (i: EventInput) => tx(() => {
-      const id = Number(q.insEvent.run(i.title, i.who, i.startsAt, i.timezone, now()).lastInsertRowid);
+      const id = Number(q.insEvent.run(i.title, i.who, i.startsAt, i.timezone, i.repeatWeekly ? 1 : 0, now()).lastInsertRowid);
       addReminders(id, i.startsAt, i.offsets);
       return toEvent(q.event.get(id));
     }),
@@ -61,7 +63,7 @@ export function createStore(db: Db, now: () => number = Date.now) {
     updateEvent: (id: number, i: EventInput) => tx(() => {
       const cur = q.event.get(id) as any;
       if (!cur) return null;
-      q.updEvent.run(i.title, i.who, i.startsAt, i.timezone, id);
+      q.updEvent.run(i.title, i.who, i.startsAt, i.timezone, i.repeatWeekly ? 1 : 0, id);
       if (cur.starts_at !== i.startsAt) {
         q.delAllReminders.run(id);
         addReminders(id, i.startsAt, i.offsets);
@@ -74,6 +76,21 @@ export function createStore(db: Db, now: () => number = Date.now) {
         addReminders(id, i.startsAt, i.offsets.filter((o) => !sent.has(o) && !have.has(o)));
       }
       return toEvent(q.event.get(id));
+    }),
+
+    /** Weekly tasks whose occurrence is over move to next week's date with a fresh set of reminders. */
+    rollRecurring: (t: number) => tx(() => {
+      let rolled = 0;
+      for (const e of q.overdueRepeating.all(t) as any[]) {
+        const offsets = [...new Set((q.remindersOf.all(e.id) as any[]).map((r) => r.offset_minutes as number))];
+        let next = e.starts_at as number;
+        while (next < t) next = addDays(next, 7, e.timezone);
+        q.setStart.run(next, e.id);
+        q.delAllReminders.run(e.id);
+        addReminders(e.id, next, offsets, t);
+        rolled++;
+      }
+      return rolled;
     }),
 
     deleteEvent: (id: number) => Number(q.delEvent.run(id).changes) > 0,

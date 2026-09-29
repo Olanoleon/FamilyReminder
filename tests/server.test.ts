@@ -23,7 +23,7 @@ function setup(now: number) {
   return { store, sent, send, call, fail };
 }
 const body = (o: object) => ({ body: JSON.stringify(o) });
-const ev = { title: 'Clase de guitarra', who: 'Ricardo', startsAt: start, timezone: TZ, offsets: [1440, 120] };
+const ev = { title: 'Clase de guitarra', who: 'Ricardo', startsAt: start, timezone: TZ, repeatWeekly: false, offsets: [1440, 120] };
 const sub = (n: string) => ({ subscription: { endpoint: `https://push/${n}`, keys: { p256dh: 'p', auth: 'a' } }, deviceName: `iPhone de ${n}`, platform: 'iOS' });
 
 describe('api', () => {
@@ -72,10 +72,10 @@ describe('scheduler', () => {
     store.upsertSub({ endpoint: 'https://push/alive', p256dh: 'p', auth: 'a', deviceName: 'a', platform: 'iOS' });
     store.upsertSub({ endpoint: 'https://push/dead', p256dh: 'p', auth: 'a', deviceName: 'b', platform: 'iOS' });
     fail['https://push/dead'] = 410;
-    store.createEvent({ title: 'x', who: 'Todos', startsAt: start, timezone: TZ, offsets: [120] });
+    store.createEvent({ title: 'x', who: 'Todos', startsAt: start, timezone: TZ, repeatWeekly: false, offsets: [120] });
     expect(await tick(store, send, start + H)).toBe(0); // server was down; event over → skipped
     expect(sent).toHaveLength(0);
-    store.createEvent({ title: 'y', who: 'Todos', startsAt: start + 5 * H, timezone: TZ, offsets: [120] });
+    store.createEvent({ title: 'y', who: 'Todos', startsAt: start + 5 * H, timezone: TZ, repeatWeekly: false, offsets: [120] });
     expect(await tick(store, send, start + 3 * H)).toBe(1);
     expect(store.listSubs().map((s) => s.endpoint)).toEqual(['https://push/alive']);
   });
@@ -94,5 +94,34 @@ describe('edit', () => {
     expect(sent).toHaveLength(1); // not re-sent
     const moved = store.updateEvent(e.id, { ...ev, startsAt: start + 24 * H })!;
     expect(moved.reminders.every((r) => r.sentAt === null)).toBe(true);
+  });
+});
+
+describe('weekly repeat', () => {
+  it('rolls to next week after the occurrence and keeps firing', async () => {
+    const { store, send, sent } = setup(start - 3 * 24 * H);
+    store.upsertSub({ endpoint: 'https://push/a', p256dh: 'p', auth: 'a', deviceName: 'a', platform: 'iOS' });
+    const e = store.createEvent({ ...ev, offsets: [120], repeatWeekly: true });
+    await tick(store, send, start - 2 * H);
+    expect(sent).toHaveLength(1);
+    await tick(store, send, start + H); // occurrence over → rolls a week ahead
+    const rolled = store.getEvent(e.id)!;
+    expect(rolled.startsAt).toBe(start + 7 * 24 * H);
+    expect(rolled.reminders.map((r) => r.sentAt)).toEqual([null]);
+    await tick(store, send, start + 7 * 24 * H - 2 * H);
+    expect(sent).toHaveLength(2);
+    expect(sent[1].body.body).toContain('hoy a las 17:00');
+  });
+  it('catches up after the server was down for weeks', async () => {
+    const { store, send } = setup(start - 3 * 24 * H);
+    const e = store.createEvent({ ...ev, offsets: [120], repeatWeekly: true });
+    await tick(store, send, start + 20 * 24 * H);
+    expect(store.getEvent(e.id)!.startsAt).toBe(start + 21 * 24 * H);
+  });
+  it('does not roll one-off events', async () => {
+    const { store, send } = setup(start - 3 * 24 * H);
+    const e = store.createEvent({ ...ev, offsets: [120] });
+    await tick(store, send, start + 3 * 24 * H);
+    expect(store.getEvent(e.id)!.startsAt).toBe(start);
   });
 });

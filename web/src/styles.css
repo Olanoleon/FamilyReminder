@@ -140,3 +140,9 @@ svg { flex-shrink: 0; }
 .bip-wave { animation: bip-wave .5s ease-in-out infinite; }
 .bubble { animation: bip-pop .25s cubic-bezier(.22,1,.36,1) both; }
 @media (prefers-reduced-motion: reduce) { .bip-bob, .bip-shadow, .bip-eyes, .bip-talk, .bip-light, .bip-wave, .bubble, .caret { animation: none; } }
+
+.check { display: flex; align-items: center; gap: 14px; padding: 14px 16px; background: var(--card); border: 3px solid var(--ink); border-radius: 16px; cursor: pointer; }
+.check input { position: absolute; opacity: 0; width: 1px; height: 1px; }
+.check .box { width: 28px; height: 28px; flex-shrink: 0; border-radius: 8px; border: 3px solid var(--line); background: var(--raised); display: flex; align-items: center; justify-content: center; color: transparent; }
+.check input:checked + .box { background: var(--gold); border-color: var(--ink); color: #0b1020; }
+.check input:focus-visible + .box { outline: 3px solid var(--gold); outline-offset: 2px; }

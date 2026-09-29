@@ -35,6 +35,8 @@ export function openDb(path = process.env.DB_PATH ?? './data/family.db') {
       created_at  INTEGER NOT NULL
     );
   `);
+  const cols = db.prepare('PRAGMA table_info(events)').all() as { name: string }[];
+  if (!cols.some((c) => c.name === 'repeat_weekly')) db.exec('ALTER TABLE events ADD COLUMN repeat_weekly INTEGER NOT NULL DEFAULT 0');
   return db;
 }
 export type Db = ReturnType<typeof openDb>;

@@ -63,10 +63,10 @@ export function Detail({ event: e, now, onBack, onDeleted }: { event: FamilyEven
         })}
       </section>
 
-      <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '14px 16px', borderRadius: 16, border: '2px dashed var(--line)', color: 'var(--muted)' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '14px 16px', borderRadius: 16, border: '2px dashed var(--line)', color: e.repeatWeekly ? 'var(--text)' : 'var(--muted)' }}>
         <Icon name="repeat" />
         <span style={{ flex: 1, fontSize: 15, fontWeight: 700 }}>Repetir cada semana</span>
-        <span class="pill">Pronto</span>
+        <span class={`pill${e.repeatWeekly ? ' ok' : ''}`}>{e.repeatWeekly ? 'Activado' : 'No'}</span>
       </div>
 
       <div class="spacer" />

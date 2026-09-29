@@ -1,7 +1,7 @@
 export interface Reminder { id: number; offsetMinutes: number; fireAt: number; sentAt: number | null; skipped: boolean }
-export interface FamilyEvent { id: number; title: string; who: string; startsAt: number; timezone: string; reminders: Reminder[] }
+export interface FamilyEvent { id: number; title: string; who: string; startsAt: number; timezone: string; repeatWeekly: boolean; reminders: Reminder[] }
 export interface Device { endpoint: string; deviceName: string; platform: string; createdAt: number }
-export interface EventInput { title: string; who: string; startsAt: number; timezone: string; offsets: number[] }
+export interface EventInput { title: string; who: string; startsAt: number; timezone: string; repeatWeekly: boolean; offsets: number[] }
 
 const KEY = 'family-code';
 const safe = <T,>(fn: () => T, fallback: T): T => { try { return fn(); } catch { return fallback; } };

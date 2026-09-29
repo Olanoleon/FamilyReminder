@@ -20,7 +20,7 @@ function parseEvent(b: any): EventInput | string {
   if (typeof b?.timezone !== 'string' || !isValidTimezone(b.timezone)) return 'timezone';
   const offsets: unknown = b?.offsets;
   if (!Array.isArray(offsets) || offsets.length > 20 || !offsets.every((o) => Number.isInteger(o) && o > 0 && o <= 60 * 24 * 365)) return 'offsets';
-  return { title, who: b.who, startsAt: Math.round(b.startsAt), timezone: b.timezone, offsets: [...new Set(offsets as number[])] };
+  return { title, who: b.who, startsAt: Math.round(b.startsAt), timezone: b.timezone, repeatWeekly: b?.repeatWeekly === true, offsets: [...new Set(offsets as number[])] };
 }
 
 export function createApp(store: Store, send: Sender, opts: Opts) {

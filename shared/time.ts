@@ -81,3 +81,11 @@ export function shortStamp(ms: number, tz: string): string {
   const p = partsInZone(ms, tz);
   return `${DOW[p.dow]} ${p.day} ${MON[p.month - 1]} · ${pad(p.hour)}:${pad(p.minute)}`;
 }
+
+/** Same wall-clock time `days` days later in `tz` (keeps 17:00 at 17:00 across DST changes). */
+export function addDays(ms: number, days: number, tz: string): number {
+  const { date, time } = utcToZoned(ms, tz);
+  const [y, m, d] = date.split('-').map(Number);
+  const n = new Date(Date.UTC(y, m - 1, d + days));
+  return zonedToUtc(`${n.getUTCFullYear()}-${pad(n.getUTCMonth() + 1)}-${pad(n.getUTCDate())}`, time, tz);
+}

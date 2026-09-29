@@ -11,12 +11,12 @@ const UNIT: Record<string, number> = { min: 1, h: 60, d: 1440 };
 
 function defaults(now: number) {
   const t = utcToZoned(now + 86400000, deviceTz);
-  return { title: '', who: 'Todos', date: t.date, time: '17:00', tz: deviceTz, offsets: [1440, 120] };
+  return { title: '', who: 'Todos', date: t.date, time: '17:00', tz: deviceTz, repeat: false, offsets: [1440, 120] };
 }
 
 export function EventForm({ existing, now, onDone, onBack }: { existing?: FamilyEvent; now: number; onDone: (id: number) => void; onBack: () => void }) {
   const init = existing
-    ? { title: existing.title, who: existing.who, ...utcToZoned(existing.startsAt, existing.timezone), tz: existing.timezone,
+    ? { title: existing.title, who: existing.who, ...utcToZoned(existing.startsAt, existing.timezone), tz: existing.timezone, repeat: existing.repeatWeekly,
         offsets: existing.reminders.map((r) => r.offsetMinutes) }
     : defaults(now);
   const [title, setTitle] = useState(init.title);
@@ -24,6 +24,7 @@ export function EventForm({ existing, now, onDone, onBack }: { existing?: Family
   const [date, setDate] = useState(init.date);
   const [time, setTime] = useState(init.time);
   const [tz, setTz] = useState(init.tz);
+  const [repeat, setRepeat] = useState(init.repeat);
   const [offsets, setOffsets] = useState<number[]>(init.offsets);
   const [showCustom, setShowCustom] = useState(false);
   const [cVal, setCVal] = useState('45');
@@ -61,7 +62,7 @@ export function EventForm({ existing, now, onDone, onBack }: { existing?: Family
     if (start <= now) return setError('La tarea debe ser en el futuro.');
     setBusy(true);
     try {
-      const input = { title: title.trim(), who, startsAt: start, timezone: tz, offsets };
+      const input = { title: title.trim(), who, startsAt: start, timezone: tz, repeatWeekly: repeat, offsets };
       const saved = existing ? await updateEvent(existing.id, input) : await createEvent(input);
       onDone(saved.id);
     } catch {
@@ -106,6 +107,15 @@ export function EventForm({ existing, now, onDone, onBack }: { existing?: Family
           {zones.map((z) => <option value={z} key={z}>{z}{z === deviceTz ? ' (este teléfono)' : ''}</option>)}
         </select>
       </div>
+
+      <label class="check">
+        <input type="checkbox" checked={repeat} onChange={(e) => setRepeat(e.currentTarget.checked)} />
+        <span class="box"><Icon name="check" size={16} stroke={3.5} /></span>
+        <span style={{ display: 'flex', flexDirection: 'column' }}>
+          <span style={{ fontSize: 15, fontWeight: 800 }}>Repetir cada semana</span>
+          <span class="small">{repeat && valid ? `Todos los ${['domingos', 'lunes', 'martes', 'miércoles', 'jueves', 'viernes', 'sábados'][new Date(`${date}T12:00:00`).getDay()]} a las ${time}` : 'Clases, rutinas… se vuelve a programar solo'}</span>
+        </span>
+      </label>
 
       <div class="field" style={{ gap: 10 }}>
         <span class="label">Avisar a la tripulación</span>

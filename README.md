@@ -47,4 +47,4 @@ Then **Tripulación → Enviar prueba a todos** to confirm all phones receive it
 - Reminders whose time already passed when a task is saved are skipped; editing recomputes unsent reminders; a task whose start time already passed never fires late reminders.
 - Dead subscriptions (uninstalled apps) are pruned when the push service answers 404/410.
 
-Not built yet: weekly repeat (the UI shows "Pronto").
+Weekly repeat: tick "Repetir cada semana"; once an occurrence passes, the task moves to next week with a fresh set of reminders.
